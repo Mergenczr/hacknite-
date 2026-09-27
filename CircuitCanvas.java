@@ -679,49 +679,28 @@ public class CircuitCanvas
 
     public void sourceTransform() {
 
-        CircuitComponent source =
-                null;
-
-        Resistor resistor =
-                null;
+        CircuitComponent source = null;
+        Resistor resistor = null;
+        int selectedCount = 0;
 
 
-        int selectedCount =
-                0;
+        for (CircuitComponent component : components) {
 
-
-        for (
-                CircuitComponent component :
-                components
-        ) {
-
-            if (
-                    !component.isSelected()
-            ) {
-
+            if (!component.isSelected()) {
                 continue;
             }
 
-
             selectedCount++;
 
-
-            if (
-                    component
-                    instanceof Resistor
-            ) {
+            if (component instanceof Resistor) {
 
                 resistor =
                         (Resistor) component;
-            }
 
-
-            else if (
-                    component
-                    instanceof VoltageSource
+            } else if (
+                    component instanceof VoltageSource
                     ||
-                    component
-                    instanceof CurrentSource
+                    component instanceof CurrentSource
             ) {
 
                 source =
@@ -740,144 +719,589 @@ public class CircuitCanvas
 
             JOptionPane.showMessageDialog(
                     this,
-
-                    "Select one source and one resistor.\n"
+                    "Select exactly one source and one resistor.\n"
                     +
-                    "Use Shift + Click."
+                    "Use Shift + Click to select both."
             );
 
             return;
         }
 
 
-        double R =
+        double resistance =
                 resistor.getValue();
 
 
-        CircuitComponent
-                newSource;
+        if (resistance <= 0) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Resistance must be greater than 0."
+            );
+
+            return;
+        }
 
 
-        if (
-                source
-                instanceof VoltageSource
-        ) {
+        CircuitSolver.NodeModel model =
+                CircuitSolver.buildNodeModel(
+                        components,
+                        wires
+                );
 
-            double V =
+
+        // =====================================================
+        // THEVENIN -> NORTON
+        //
+        // Voltage source + series resistor
+        // becomes
+        // Current source || resistor
+        // =====================================================
+
+        if (source instanceof VoltageSource) {
+
+            int source0 =
+                    model.getNode(
+                            source,
+                            0
+                    );
+
+            int source1 =
+                    model.getNode(
+                            source,
+                            1
+                    );
+
+            int resistor0 =
+                    model.getNode(
+                            resistor,
+                            0
+                    );
+
+            int resistor1 =
+                    model.getNode(
+                            resistor,
+                            1
+                    );
+
+
+            int sharedNode = -1;
+
+
+            if (
+                    source0 == resistor0
+                    ||
+                    source0 == resistor1
+            ) {
+
+                sharedNode =
+                        source0;
+            }
+
+
+            if (
+                    source1 == resistor0
+                    ||
+                    source1 == resistor1
+            ) {
+
+                if (sharedNode != -1) {
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "The selected voltage source and resistor "
+                            +
+                            "are parallel, not series."
+                    );
+
+                    return;
+                }
+
+                sharedNode =
+                        source1;
+            }
+
+
+            if (
+                    sharedNode == -1
+                    ||
+                    model.countRealComponentTerminals(
+                            sharedNode
+                    ) != 2
+            ) {
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "For V -> I transformation, the selected "
+                        +
+                        "voltage source and resistor must be in series."
+                );
+
+                return;
+            }
+
+
+            int sourceOuterTerminal =
+                    source0 == sharedNode
+                    ?
+                    1
+                    :
+                    0;
+
+
+            int resistorOuterTerminal =
+                    resistor0 == sharedNode
+                    ?
+                    1
+                    :
+                    0;
+
+
+            int sourceOuterNode =
+                    model.getNode(
+                            source,
+                            sourceOuterTerminal
+                    );
+
+
+            int resistorOuterNode =
+                    model.getNode(
+                            resistor,
+                            resistorOuterTerminal
+                    );
+
+
+            ArrayList<Terminal> sourceSide =
+                    model.getExternalTerminals(
+                            sourceOuterNode,
+                            source,
+                            resistor
+                    );
+
+
+            ArrayList<Terminal> resistorSide =
+                    model.getExternalTerminals(
+                            resistorOuterNode,
+                            source,
+                            resistor
+                    );
+
+
+            double voltage =
                     source.getValue();
 
 
-            double I =
-                    CircuitSolver
-                    .voltageToCurrent(
-                            V,
-                            R
+            double current =
+                    CircuitSolver.voltageToCurrent(
+                            voltage,
+                            resistance
                     );
+
+
+            int sourceX =
+                    source.getX();
+
+            int sourceY =
+                    source.getY();
+
+
+            removeWiresFor(source);
+            removeWiresFor(resistor);
+
+            components.remove(source);
 
 
             currentCount++;
 
 
-            newSource =
+            CurrentSource newSource =
                     new CurrentSource(
-                            source.getX(),
-                            source.getY(),
+                            sourceX,
+                            sourceY,
                             "I" + currentCount,
-                            I
+                            current
                     );
+
+
+            /*
+             * Make the resistor vertical so the new Norton
+             * equivalent is visually parallel.
+             */
+            if (!resistor.isVertical()) {
+                resistor.rotate();
+            }
+
+
+            resistor.setPosition(
+                    sourceX + 120,
+                    sourceY - 20
+            );
+
+
+            /*
+             * Norton polarity:
+             * CurrentSource terminal 0 is the arrow-head node.
+             *
+             * If the original voltage source's positive terminal
+             * was the outer source-side terminal, terminal 0 goes
+             * to that node. Otherwise the polarity is reversed.
+             */
+            boolean sourceOuterWasPositive =
+                    sourceOuterTerminal == 0;
+
+
+            Terminal currentSourceSide =
+                    new Terminal(
+                            newSource,
+                            sourceOuterWasPositive
+                            ?
+                            0
+                            :
+                            1
+                    );
+
+
+            Terminal currentResistorSide =
+                    new Terminal(
+                            newSource,
+                            sourceOuterWasPositive
+                            ?
+                            1
+                            :
+                            0
+                    );
+
+
+            Terminal resistorSourceSide =
+                    new Terminal(
+                            resistor,
+                            0
+                    );
+
+
+            Terminal resistorResistorSide =
+                    new Terminal(
+                            resistor,
+                            1
+                    );
+
+
+            // Put current source and resistor in parallel.
+            wires.add(
+                    new Wire(
+                            currentSourceSide,
+                            resistorSourceSide
+                    )
+            );
+
+            wires.add(
+                    new Wire(
+                            currentResistorSide,
+                            resistorResistorSide
+                    )
+            );
+
+
+            // Restore everything that was connected to the
+            // two external Thevenin terminals.
+            for (Terminal terminal : sourceSide) {
+
+                wires.add(
+                        new Wire(
+                                currentSourceSide,
+                                new Terminal(
+                                        terminal.getComponent(),
+                                        terminal.getIndex()
+                                )
+                        )
+                );
+            }
+
+
+            for (Terminal terminal : resistorSide) {
+
+                wires.add(
+                        new Wire(
+                                currentResistorSide,
+                                new Terminal(
+                                        terminal.getComponent(),
+                                        terminal.getIndex()
+                                )
+                        )
+                );
+            }
+
+
+            components.add(
+                    newSource
+            );
+
+
+            deselectAll();
+
+            newSource.setSelected(true);
+            resistor.setSelected(true);
 
 
             JOptionPane.showMessageDialog(
                     this,
-
                     String.format(
-                            "I = V / R%n%n"
+                            "Voltage source + series resistor -> "
                             +
-                            "I = %.3f / %.3f%n%n"
+                            "Current source || resistor%n%n"
+                            +
+                            "I = V / R%n"
+                            +
+                            "I = %.3f / %.3f%n"
                             +
                             "I = %.3f A",
-                            V,
-                            R,
-                            I
+                            voltage,
+                            resistance,
+                            current
                     )
             );
+
+
+            repaint();
+
+            return;
         }
 
 
-        else {
+        // =====================================================
+        // NORTON -> THEVENIN
+        //
+        // Current source || resistor
+        // becomes
+        // Voltage source + series resistor
+        // =====================================================
 
-            double I =
-                    source.getValue();
-
-
-            double V =
-                    CircuitSolver
-                    .currentToVoltage(
-                            I,
-                            R
-                    );
+        CurrentSource currentSource =
+                (CurrentSource) source;
 
 
-            voltageCount++;
+        int source0 =
+                model.getNode(
+                        currentSource,
+                        0
+                );
+
+        int source1 =
+                model.getNode(
+                        currentSource,
+                        1
+                );
+
+        int resistor0 =
+                model.getNode(
+                        resistor,
+                        0
+                );
+
+        int resistor1 =
+                model.getNode(
+                        resistor,
+                        1
+                );
 
 
-            newSource =
-                    new VoltageSource(
-                            source.getX(),
-                            source.getY(),
-                            "V" + voltageCount,
-                            V
-                    );
+        boolean parallel =
+                (
+                        source0 == resistor0
+                        &&
+                        source1 == resistor1
+                )
+                ||
+                (
+                        source0 == resistor1
+                        &&
+                        source1 == resistor0
+                );
 
+
+        if (!parallel) {
 
             JOptionPane.showMessageDialog(
                     this,
-
-                    String.format(
-                            "V = I × R%n%n"
-                            +
-                            "V = %.3f × %.3f%n%n"
-                            +
-                            "V = %.3f V",
-                            I,
-                            R,
-                            V
-                    )
+                    "For I -> V transformation, the selected "
+                    +
+                    "current source and resistor must be parallel."
             );
+
+            return;
         }
+
+
+        ArrayList<Terminal> positiveSide =
+                model.getExternalTerminals(
+                        source0,
+                        currentSource,
+                        resistor
+                );
+
+
+        ArrayList<Terminal> negativeSide =
+                model.getExternalTerminals(
+                        source1,
+                        currentSource,
+                        resistor
+                );
+
+
+        double current =
+                currentSource.getValue();
+
+
+        double voltage =
+                CircuitSolver.currentToVoltage(
+                        current,
+                        resistance
+                );
+
+
+        int sourceX =
+                currentSource.getX();
+
+        int sourceY =
+                currentSource.getY();
+
+
+        removeWiresFor(currentSource);
+        removeWiresFor(resistor);
+
+        components.remove(
+                currentSource
+        );
+
+
+        voltageCount++;
+
+
+        VoltageSource newSource =
+                new VoltageSource(
+                        sourceX,
+                        sourceY,
+                        "V" + voltageCount,
+                        voltage
+                );
 
 
         /*
-         * Keep wires connected after
-         * replacing the source.
+         * Build a vertical series pair:
+         *
+         * positive outer node
+         *       |
+         *      V
+         *       |
+         *      R
+         *       |
+         * negative outer node
          */
-        for (
-                Wire wire :
-                wires
-        ) {
+        if (!resistor.isVertical()) {
+            resistor.rotate();
+        }
 
-            wire.replaceComponent(
-                    source,
-                    newSource
+
+        resistor.setPosition(
+                sourceX + 10,
+                sourceY + 110
+        );
+
+
+        Terminal voltagePositive =
+                new Terminal(
+                        newSource,
+                        0
+                );
+
+
+        Terminal voltageNegative =
+                new Terminal(
+                        newSource,
+                        1
+                );
+
+
+        Terminal resistorTop =
+                new Terminal(
+                        resistor,
+                        0
+                );
+
+
+        Terminal resistorBottom =
+                new Terminal(
+                        resistor,
+                        1
+                );
+
+
+        // Internal series connection.
+        wires.add(
+                new Wire(
+                        voltageNegative,
+                        resistorTop
+                )
+        );
+
+
+        // Restore original positive Norton node.
+        for (Terminal terminal : positiveSide) {
+
+            wires.add(
+                    new Wire(
+                            voltagePositive,
+                            new Terminal(
+                                    terminal.getComponent(),
+                                    terminal.getIndex()
+                            )
+                    )
             );
         }
 
 
-        components.remove(
-                source
+        // Restore original negative Norton node.
+        for (Terminal terminal : negativeSide) {
+
+            wires.add(
+                    new Wire(
+                            resistorBottom,
+                            new Terminal(
+                                    terminal.getComponent(),
+                                    terminal.getIndex()
+                            )
+                    )
+            );
+        }
+
+
+        components.add(
+                newSource
         );
 
 
         deselectAll();
 
-
-        newSource.setSelected(
-                true
-        );
+        newSource.setSelected(true);
+        resistor.setSelected(true);
 
 
-        components.add(
-                newSource
+        JOptionPane.showMessageDialog(
+                this,
+                String.format(
+                        "Current source || resistor -> "
+                        +
+                        "Voltage source + series resistor%n%n"
+                        +
+                        "V = I x R%n"
+                        +
+                        "V = %.3f x %.3f%n"
+                        +
+                        "V = %.3f V",
+                        current,
+                        resistance,
+                        voltage
+                )
         );
 
 
