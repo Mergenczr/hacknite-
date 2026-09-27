@@ -139,6 +139,13 @@ public abstract class CircuitComponent {
     }
 
 
+    /*
+     * Every drawable component must provide its own
+     * 90-degree rotation behavior.
+     */
+    public abstract void rotate();
+
+
     public abstract String getUnit();
 
 
