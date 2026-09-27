@@ -118,9 +118,9 @@ public class CircuitSolver {
     // NODE MODEL
     // =========================================================
 
-    private static class NodeModel {
+    public static class NodeModel {
 
-        Map<TerminalKey, Integer> nodeMap;
+        private Map<TerminalKey, Integer> nodeMap;
         int nodeCount;
 
         NodeModel(
@@ -131,7 +131,7 @@ public class CircuitSolver {
             this.nodeCount = nodeCount;
         }
 
-        int getNode(
+        public int getNode(
                 CircuitComponent component,
                 int terminal
         ) {
@@ -149,6 +149,69 @@ public class CircuitSolver {
             }
 
             return node;
+        }
+
+
+        public int countRealComponentTerminals(
+                int node
+        ) {
+
+            int count = 0;
+
+            for (
+                    Map.Entry<TerminalKey, Integer> entry :
+                    nodeMap.entrySet()
+            ) {
+
+                if (
+                        entry.getValue() == node
+                        &&
+                        !(entry.getKey().component instanceof JustWire)
+                ) {
+
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+
+        public ArrayList<Terminal> getExternalTerminals(
+                int node,
+                CircuitComponent exclude1,
+                CircuitComponent exclude2
+        ) {
+
+            ArrayList<Terminal> result =
+                    new ArrayList<>();
+
+            for (
+                    Map.Entry<TerminalKey, Integer> entry :
+                    nodeMap.entrySet()
+            ) {
+
+                TerminalKey key =
+                        entry.getKey();
+
+                if (
+                        entry.getValue() == node
+                        &&
+                        key.component != exclude1
+                        &&
+                        key.component != exclude2
+                ) {
+
+                    result.add(
+                            new Terminal(
+                                    key.component,
+                                    key.terminal
+                            )
+                    );
+                }
+            }
+
+            return result;
         }
     }
 
@@ -188,7 +251,7 @@ public class CircuitSolver {
     // BUILD ELECTRICAL NODES
     // =========================================================
 
-    private static NodeModel buildNodeModel(
+    public static NodeModel buildNodeModel(
             ArrayList<CircuitComponent> components,
             ArrayList<Wire> wires
     ) {
