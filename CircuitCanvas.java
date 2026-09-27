@@ -65,6 +65,37 @@ public class CircuitCanvas
         addMouseMotionListener(this);
 
         addKeyListener(this);
+
+        /*
+         * Use Swing key bindings as well as KeyListener.
+         * WHEN_IN_FOCUSED_WINDOW means R works even if a toolbar
+         * button or another Swing control currently has focus.
+         */
+        getInputMap(
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        ).put(
+                KeyStroke.getKeyStroke('R'),
+                "rotateSelected"
+        );
+
+        getInputMap(
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        ).put(
+                KeyStroke.getKeyStroke('r'),
+                "rotateSelected"
+        );
+
+        getActionMap().put(
+                "rotateSelected",
+                new AbstractAction() {
+                    @Override
+                    public void actionPerformed(
+                            ActionEvent e
+                    ) {
+                        rotateSelected();
+                    }
+                }
+        );
     }
 
 
@@ -1368,6 +1399,50 @@ public class CircuitCanvas
 
 
     // =========================================================
+    // ROTATE SELECTED
+    // =========================================================
+
+    public void rotateSelected() {
+
+        for (
+                CircuitComponent component :
+                components
+        ) {
+
+            if (!component.isSelected()) {
+                continue;
+            }
+
+            if (component instanceof Resistor) {
+
+                ((Resistor) component).rotate();
+
+            } else if (
+                    component instanceof VoltageSource
+            ) {
+
+                ((VoltageSource) component).rotate();
+
+            } else if (
+                    component instanceof CurrentSource
+            ) {
+
+                ((CurrentSource) component).rotate();
+
+            } else if (
+                    component instanceof JustWire
+            ) {
+
+                ((JustWire) component).rotate();
+            }
+        }
+
+        repaint();
+        requestFocusInWindow();
+    }
+
+
+    // =========================================================
     // KEYBOARD
     // =========================================================
 
@@ -1402,42 +1477,7 @@ public class CircuitCanvas
                 e.getKeyCode() == KeyEvent.VK_R
         ) {
 
-            for (
-                    CircuitComponent component :
-                    components
-            ) {
-
-                if (!component.isSelected()) {
-                    continue;
-                }
-
-
-                if (component instanceof Resistor) {
-
-                    ((Resistor) component).rotate();
-
-                } else if (
-                        component instanceof VoltageSource
-                ) {
-
-                    ((VoltageSource) component).rotate();
-
-                } else if (
-                        component instanceof CurrentSource
-                ) {
-
-                    ((CurrentSource) component).rotate();
-
-                } else if (
-                        component instanceof JustWire
-                ) {
-
-                    ((JustWire) component).rotate();
-                }
-            }
-
-
-            repaint();
+            rotateSelected();
         }
     }
 
