@@ -1377,16 +1377,67 @@ public class CircuitCanvas
     ) {
 
         if (
-                e.getKeyCode()
-                ==
-                KeyEvent.VK_DELETE
+                e.getKeyCode() == KeyEvent.VK_DELETE
                 ||
-                e.getKeyCode()
-                ==
-                KeyEvent.VK_BACK_SPACE
+                e.getKeyCode() == KeyEvent.VK_BACK_SPACE
         ) {
 
             deleteSelected();
+            return;
+        }
+
+
+        if (
+                e.getKeyCode() == KeyEvent.VK_ESCAPE
+        ) {
+
+            selectedTerminal = null;
+            draggingNewType = null;
+            repaint();
+            return;
+        }
+
+
+        if (
+                e.getKeyCode() == KeyEvent.VK_R
+        ) {
+
+            for (
+                    CircuitComponent component :
+                    components
+            ) {
+
+                if (!component.isSelected()) {
+                    continue;
+                }
+
+
+                if (component instanceof Resistor) {
+
+                    ((Resistor) component).rotate();
+
+                } else if (
+                        component instanceof VoltageSource
+                ) {
+
+                    ((VoltageSource) component).rotate();
+
+                } else if (
+                        component instanceof CurrentSource
+                ) {
+
+                    ((CurrentSource) component).rotate();
+
+                } else if (
+                        component instanceof JustWire
+                ) {
+
+                    ((JustWire) component).rotate();
+                }
+            }
+
+
+            repaint();
         }
     }
 
