@@ -23,6 +23,9 @@ public class Main {
             JButton transformButton =
                     new JButton("Source Transform");
 
+            JButton rotateButton =
+                    new JButton("Rotate (R)");
+
             JButton deleteButton =
                     new JButton("Delete Selected");
 
@@ -32,6 +35,7 @@ public class Main {
 
             toolbar.add(solveButton);
             toolbar.add(transformButton);
+            toolbar.add(rotateButton);
             toolbar.add(deleteButton);
             toolbar.add(clearButton);
 
@@ -42,6 +46,10 @@ public class Main {
 
             transformButton.addActionListener(
                     e -> canvas.sourceTransform()
+            );
+
+            rotateButton.addActionListener(
+                    e -> canvas.rotateSelected()
             );
 
             deleteButton.addActionListener(
