@@ -488,82 +488,121 @@ public class CircuitSolver {
         );
 
 
-        // For now, current sources are not included
-        // in the voltage-source Req/I mode.
-        if (!currentSources.isEmpty()) {
+        /*
+         * Simple source mode:
+         *
+         * 1 voltage source + resistor network:
+         *      Req -> I = V / Req
+         *
+         * 1 current source + resistor network:
+         *      Req -> V = I * Req
+         *
+         * Mixed/multiple independent sources will be handled
+         * later by the full nodal/MNA solver.
+         */
+        int totalSources =
+                voltageSources.size()
+                +
+                currentSources.size();
+
+
+        if (totalSources == 0) {
 
             output.append(
-                    "NOTE: A current source is present.\n"
+                    "No source found.\n"
             );
 
             output.append(
-                    "The automatic Req + I calculation below "
-                    + "currently handles a resistor network driven "
-                    + "by one voltage source.\n\n"
-            );
-        }
-
-
-        if (voltageSources.isEmpty()) {
-
-            output.append(
-                    "No voltage source found.\n"
-            );
-
-            output.append(
-                    "Add a voltage source if you want the program "
-                    + "to calculate I = V / Req automatically.\n"
-            );
-
-            return output.toString();
-        }
-
-
-        if (voltageSources.size() > 1) {
-
-            output.append(
-                    "More than one voltage source is present.\n"
-            );
-
-            output.append(
-                    "For now, Req + I mode supports one voltage source "
-                    + "at a time.\n"
+                    "Add one voltage source or one current source "
+                    + "to calculate the source current/voltage.\n"
             );
 
             return output.toString();
         }
 
 
-        if (!currentSources.isEmpty()) {
+        if (totalSources > 1) {
 
             output.append(
-                    "Remove the current source for the simple "
-                    + "Req + voltage-source current calculation.\n"
+                    "Multiple independent sources detected.\n"
+            );
+
+            output.append(
+                    "The current simple solver handles one source "
+                    + "at a time. Full multi-source nodal analysis "
+                    + "will be the next solver mode.\n"
             );
 
             return output.toString();
         }
 
 
-        VoltageSource source =
-                voltageSources.get(0);
+        boolean voltageMode =
+                voltageSources.size() == 1;
 
 
-        int positiveNode =
-                nodes.getNode(
-                        source,
-                        0
-                );
+        CircuitComponent source;
 
-        int negativeNode =
-                nodes.getNode(
-                        source,
-                        1
-                );
+        int positiveNode;
+        int negativeNode;
+
+        double sourceVoltage = 0.0;
+        double sourceCurrent = 0.0;
 
 
-        double sourceVoltage =
-                source.getValue();
+        if (voltageMode) {
+
+            VoltageSource voltageSource =
+                    voltageSources.get(0);
+
+            source =
+                    voltageSource;
+
+            positiveNode =
+                    nodes.getNode(
+                            voltageSource,
+                            0
+                    );
+
+            negativeNode =
+                    nodes.getNode(
+                            voltageSource,
+                            1
+                    );
+
+            sourceVoltage =
+                    voltageSource.getValue();
+
+        } else {
+
+            CurrentSource currentSource =
+                    currentSources.get(0);
+
+            source =
+                    currentSource;
+
+            /*
+             * CurrentSource drawing convention:
+             * arrow goes from terminal 1 toward terminal 0.
+             *
+             * Therefore terminal 0 is the node receiving
+             * the positive current injection.
+             */
+            positiveNode =
+                    nodes.getNode(
+                            currentSource,
+                            0
+                    );
+
+            negativeNode =
+                    nodes.getNode(
+                            currentSource,
+                            1
+                    );
+
+            sourceCurrent =
+                    currentSource.getValue();
+        }
 
 
         output.append(
@@ -574,24 +613,41 @@ public class CircuitSolver {
                 "----------------------------------------\n"
         );
 
-        output.append(
-                source.getName()
-                + " = "
-                + String.format(
-                        "%.4f",
-                        sourceVoltage
-                )
-                + " V\n"
-        );
+
+        if (voltageMode) {
+
+            output.append(
+                    source.getName()
+                    + " = "
+                    + String.format(
+                            "%.4f",
+                            sourceVoltage
+                    )
+                    + " V\n"
+            );
+
+        } else {
+
+            output.append(
+                    source.getName()
+                    + " = "
+                    + String.format(
+                            "%.4f",
+                            sourceCurrent
+                    )
+                    + " A\n"
+            );
+        }
+
 
         output.append(
-                "Positive terminal: Node "
+                "Terminal 0 node: Node "
                 + positiveNode
                 + "\n"
         );
 
         output.append(
-                "Negative terminal: Node "
+                "Terminal 1 node: Node "
                 + negativeNode
                 + "\n\n"
         );
@@ -600,25 +656,33 @@ public class CircuitSolver {
         if (positiveNode == negativeNode) {
 
             output.append(
-                    "The voltage source is shorted because both "
-                    + "terminals are on the same node.\n"
+                    "Both source terminals are on the same node.\n"
             );
 
             output.append(
                     "Req = 0 ohms\n"
             );
 
-            output.append(
-                    "An ideal voltage source across 0 ohms would "
-                    + "produce unbounded current.\n"
-            );
+
+            if (voltageMode) {
+
+                output.append(
+                        "An ideal non-zero voltage source cannot "
+                        + "be connected across the same node.\n"
+                );
+
+            } else {
+
+                output.append(
+                        "V = I * Req = 0 V\n"
+                );
+            }
+
 
             return output.toString();
         }
 
 
-        // Find nodes that are actually connected to the
-        // positive source terminal through resistors.
         Set<Integer> reachable =
                 findReachableNodes(
                         positiveNode,
@@ -633,24 +697,36 @@ public class CircuitSolver {
             );
 
             output.append(
-                    "There is no resistor path from the positive "
-                    + "source terminal to the negative terminal.\n\n"
+                    "There is no resistor path between the "
+                    + "two source terminals.\n\n"
             );
 
             output.append(
                     "Req = infinity\n"
             );
 
-            output.append(
-                    "I = 0 A\n"
-            );
+
+            if (voltageMode) {
+
+                output.append(
+                        "I = 0 A\n"
+                );
+
+            } else {
+
+                output.append(
+                        "For an ideal current source driving an "
+                        + "open circuit, the required voltage is "
+                        + "unbounded/undefined.\n"
+                );
+            }
+
 
             return output.toString();
         }
 
 
-        // Solve once using a 1 V test source.
-        // Req = 1 V / Itest.
+        // Calculate equivalent resistance with a 1 V test source.
         Map<Integer, Double> testVoltages =
                 solveResistorNodeVoltages(
                         reachable,
@@ -673,15 +749,7 @@ public class CircuitSolver {
         if (Math.abs(testCurrent) < 1e-12) {
 
             output.append(
-                    "The resistor network behaves as an open circuit.\n"
-            );
-
-            output.append(
                     "Req = infinity\n"
-            );
-
-            output.append(
-                    "I = 0 A\n"
             );
 
             return output.toString();
@@ -689,19 +757,9 @@ public class CircuitSolver {
 
 
         double equivalentResistance =
-                1.0 / testCurrent;
-
-
-        if (equivalentResistance < 0) {
-            equivalentResistance =
-                    -equivalentResistance;
-        }
-
-
-        double sourceCurrent =
-                sourceVoltage
-                /
-                equivalentResistance;
+                Math.abs(
+                        1.0 / testCurrent
+                );
 
 
         output.append(
@@ -748,43 +806,96 @@ public class CircuitSolver {
         );
 
 
-        output.append(
-                "SOURCE CURRENT\n"
-        );
+        if (voltageMode) {
 
-        output.append(
-                "----------------------------------------\n"
-        );
-
-        output.append(
-                "I = V / Req\n"
-        );
-
-        output.append(
-                "I = "
-                + String.format(
-                        "%.4f",
-                        sourceVoltage
-                )
-                + " / "
-                + String.format(
-                        "%.4f",
-                        equivalentResistance
-                )
-                + "\n"
-        );
-
-        output.append(
-                "I = "
-                + String.format(
-                        "%.6f",
-                        sourceCurrent
-                )
-                + " A\n\n"
-        );
+            sourceCurrent =
+                    sourceVoltage
+                    /
+                    equivalentResistance;
 
 
-        // Solve actual node voltages using the real source voltage.
+            output.append(
+                    "SOURCE CURRENT\n"
+            );
+
+            output.append(
+                    "----------------------------------------\n"
+            );
+
+            output.append(
+                    "I = V / Req\n"
+            );
+
+            output.append(
+                    "I = "
+                    + String.format(
+                            "%.4f",
+                            sourceVoltage
+                    )
+                    + " / "
+                    + String.format(
+                            "%.4f",
+                            equivalentResistance
+                    )
+                    + "\n"
+            );
+
+            output.append(
+                    "I = "
+                    + String.format(
+                            "%.6f",
+                            sourceCurrent
+                    )
+                    + " A\n\n"
+            );
+
+        } else {
+
+            sourceVoltage =
+                    sourceCurrent
+                    *
+                    equivalentResistance;
+
+
+            output.append(
+                    "SOURCE VOLTAGE\n"
+            );
+
+            output.append(
+                    "----------------------------------------\n"
+            );
+
+            output.append(
+                    "V = I * Req\n"
+            );
+
+            output.append(
+                    "V = "
+                    + String.format(
+                            "%.4f",
+                            sourceCurrent
+                    )
+                    + " * "
+                    + String.format(
+                            "%.4f",
+                            equivalentResistance
+                    )
+                    + "\n"
+            );
+
+            output.append(
+                    "V = "
+                    + String.format(
+                            "%.6f",
+                            sourceVoltage
+                    )
+                    + " V\n\n"
+            );
+        }
+
+
+        // With one source, the resistor-network node voltages
+        // can now be solved using the source voltage we know.
         Map<Integer, Double> actualVoltages =
                 solveResistorNodeVoltages(
                         reachable,
