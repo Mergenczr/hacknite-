@@ -1404,6 +1404,8 @@ public class CircuitCanvas
 
     public void rotateSelected() {
 
+        boolean rotatedSomething = false;
+
         for (
                 CircuitComponent component :
                 components
@@ -1413,31 +1415,15 @@ public class CircuitCanvas
                 continue;
             }
 
-            if (component instanceof Resistor) {
-
-                ((Resistor) component).rotate();
-
-            } else if (
-                    component instanceof VoltageSource
-            ) {
-
-                ((VoltageSource) component).rotate();
-
-            } else if (
-                    component instanceof CurrentSource
-            ) {
-
-                ((CurrentSource) component).rotate();
-
-            } else if (
-                    component instanceof JustWire
-            ) {
-
-                ((JustWire) component).rotate();
-            }
+            component.rotate();
+            rotatedSomething = true;
         }
 
-        repaint();
+        if (rotatedSomething) {
+            revalidate();
+            repaint();
+        }
+
         requestFocusInWindow();
     }
 
