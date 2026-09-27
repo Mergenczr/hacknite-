@@ -51,6 +51,8 @@ public class CircuitCanvas
 
     private int currentCount = 0;
 
+    private int wireCount = 0;
+
 
     public CircuitCanvas() {
 
@@ -66,36 +68,6 @@ public class CircuitCanvas
 
         addKeyListener(this);
 
-        /*
-         * Use Swing key bindings as well as KeyListener.
-         * WHEN_IN_FOCUSED_WINDOW means R works even if a toolbar
-         * button or another Swing control currently has focus.
-         */
-        getInputMap(
-                JComponent.WHEN_IN_FOCUSED_WINDOW
-        ).put(
-                KeyStroke.getKeyStroke('R'),
-                "rotateSelected"
-        );
-
-        getInputMap(
-                JComponent.WHEN_IN_FOCUSED_WINDOW
-        ).put(
-                KeyStroke.getKeyStroke('r'),
-                "rotateSelected"
-        );
-
-        getActionMap().put(
-                "rotateSelected",
-                new AbstractAction() {
-                    @Override
-                    public void actionPerformed(
-                            ActionEvent e
-                    ) {
-                        rotateSelected();
-                    }
-                }
-        );
     }
 
 
@@ -218,6 +190,39 @@ public class CircuitCanvas
 
             else if (
                     draggingNewType.equals(
+                            "RESISTOR_Y"
+                    )
+            ) {
+
+                Resistor previewResistor =
+                        new Resistor(
+                                mouseX - 30,
+                                mouseY - 60,
+                                "R?",
+                                100
+                        );
+
+                previewResistor.rotate();
+                previewResistor.draw(preview);
+            }
+
+
+            else if (
+                    draggingNewType.equals(
+                            "JUSTWIRE"
+                    )
+            ) {
+
+                new JustWire(
+                        mouseX - 60,
+                        mouseY - 20,
+                        "W?"
+                ).draw(preview);
+            }
+
+
+            else if (
+                    draggingNewType.equals(
                             "VOLTAGE"
                     )
             ) {
@@ -310,60 +315,98 @@ public class CircuitCanvas
         );
 
 
-        Resistor resistor =
+        // Horizontal resistor (X direction)
+        Resistor resistorX =
                 new Resistor(
-                        40,
+                        10,
                         70,
                         "",
                         100
                 );
 
+        resistorX.drawSymbol(g);
 
-        resistor.drawSymbol(g);
-
+        g.setFont(
+                new Font(
+                        "Arial",
+                        Font.BOLD,
+                        14
+                )
+        );
 
         g.drawString(
-                "Resistor",
-                55,
+                "R-X",
+                50,
                 145
+        );
+
+
+        // Vertical resistor (Y direction)
+        Resistor resistorY =
+                new Resistor(
+                        135,
+                        60,
+                        "",
+                        100
+                );
+
+        resistorY.rotate();
+        resistorY.drawSymbol(g);
+
+        g.drawString(
+                "R-Y",
+                150,
+                195
         );
 
 
         VoltageSource voltage =
                 new VoltageSource(
                         60,
-                        175,
+                        215,
                         "",
                         10
                 );
 
-
         voltage.drawSymbol(g);
-
 
         g.drawString(
                 "Voltage Source",
-                25,
-                270
+                35,
+                310
         );
 
 
         CurrentSource current =
                 new CurrentSource(
                         60,
-                        300,
+                        335,
                         "",
                         1
                 );
 
-
         current.drawSymbol(g);
-
 
         g.drawString(
                 "Current Source",
-                25,
-                395
+                35,
+                430
+        );
+
+
+        JustWire justWire =
+                new JustWire(
+                        40,
+                        465,
+                        ""
+                );
+
+        justWire.drawSymbol(g);
+
+        g.drawString(
+                "Wire",
+                80,
+                530
         );
 
 
@@ -911,7 +954,10 @@ public class CircuitCanvas
                 PALETTE_WIDTH
         ) {
 
+            // Horizontal resistor: left side of the resistor row
             if (
+                    mouseX < 130
+                    &&
                     mouseY >= 55
                     &&
                     mouseY <= 155
@@ -924,10 +970,26 @@ public class CircuitCanvas
             }
 
 
+            // Vertical resistor: right side of the resistor row
             if (
-                    mouseY >= 165
+                    mouseX >= 130
                     &&
-                    mouseY <= 280
+                    mouseY >= 55
+                    &&
+                    mouseY <= 205
+            ) {
+
+                draggingNewType =
+                        "RESISTOR_Y";
+
+                return;
+            }
+
+
+            if (
+                    mouseY >= 205
+                    &&
+                    mouseY <= 325
             ) {
 
                 draggingNewType =
@@ -938,13 +1000,26 @@ public class CircuitCanvas
 
 
             if (
-                    mouseY >= 290
+                    mouseY >= 325
                     &&
-                    mouseY <= 410
+                    mouseY <= 445
             ) {
 
                 draggingNewType =
                         "CURRENT";
+
+                return;
+            }
+
+
+            if (
+                    mouseY >= 450
+                    &&
+                    mouseY <= 540
+            ) {
+
+                draggingNewType =
+                        "JUSTWIRE";
 
                 return;
             }
@@ -1182,6 +1257,48 @@ public class CircuitCanvas
                                     mouseY - 30,
                                     "R" + resistorCount,
                                     100
+                            )
+                    );
+                }
+
+
+                else if (
+                        draggingNewType.equals(
+                                "RESISTOR_Y"
+                        )
+                ) {
+
+                    resistorCount++;
+
+                    Resistor verticalResistor =
+                            new Resistor(
+                                    mouseX - 30,
+                                    mouseY - 60,
+                                    "R" + resistorCount,
+                                    100
+                            );
+
+                    verticalResistor.rotate();
+
+                    components.add(
+                            verticalResistor
+                    );
+                }
+
+
+                else if (
+                        draggingNewType.equals(
+                                "JUSTWIRE"
+                        )
+                ) {
+
+                    wireCount++;
+
+                    components.add(
+                            new JustWire(
+                                    mouseX - 60,
+                                    mouseY - 20,
+                                    "W" + wireCount
                             )
                     );
                 }
